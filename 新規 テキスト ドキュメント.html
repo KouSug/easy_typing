@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>タイピングゲーム (CSV版)</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; }
+        #question { font-size: 2em; font-weight: bold; margin: 20px; }
+        #answer { font-size: 1.5em; padding: 10px; width: 300px; }
+    </style>
+</head>
+<body>
+
+    <h1>タイピングゲーム</h1>
+    <div id="question">読み込み中...</div>
+    <input type="text" id="answer" autocomplete="off" autocorrect="off">
+    <div id="message"></div>
+
+    <script>
+        // ▼▼▼ ステップ1でコピーしたCSVの公開URLをここに貼り付け ▼▼▼
+        const DATA_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR-BFItFVtJWMXf0GdsdB3Ln7Hz5qvcjDVSyBU0T6MosUelNmO0_oVt9pWg9ekdyAtqaBDokkVWKolj/pub?gid=543569375&single=true&output=csv';
+
+        let words = [];
+        let currentWord = '';
+
+        const questionEl = document.getElementById("question");
+        const answerEl = document.getElementById("answer");
+        const messageEl = document.getElementById("message");
+
+        // データを読み込む
+        async function loadWords() {
+            try {
+                const response = await fetch(DATA_URL);
+                if (!response.ok) {
+                    throw new Error('データの取得に失敗しました。');
+                }
+                
+                // CSVデータをテキストとして取得
+                const csvText = await response.text();
+                
+                // --- CSVを配列に変換 ---
+                // 1. .split('\n') で改行ごとに区切って配列にする
+                // 2. .filter(Boolean) で空の行（末尾の改行など）を取り除く
+                // 3. (もしA列以外も使う場合、さらに .map(row => row.split(',')[0]) などでカンマ区切りを処理)
+                
+                // 今回はA列のみ（1列のみ）と想定
+                words = csvText.split('\n').filter(Boolean); 
+
+                if (words.length === 0) {
+                    throw new Error('単語リストが空です。');
+                }
+
+                console.log("読み込んだ単語:", words);
+                setNextWord();
+                
+            } catch (error) {
+                console.error("エラー:", error);
+                questionEl.textContent = error.message;
+            }
+        }
+
+        // 次の問題をセット
+        function setNextWord() {
+            if (words.length === 0) {
+                questionEl.textContent = "ゲームクリア！";
+                answerEl.disabled = true; // 入力不可にする
+                return;
+            }
+            // ランダムに単語を選ぶ
+            const index = Math.floor(Math.random() * words.length);
+            currentWord = words[index];
+            questionEl.textContent = currentWord;
+            answerEl.value = ''; // 入力欄をクリア
+            answerEl.focus(); // 入力欄にフォーカスを当てる
+            messageEl.textContent = '';
+        }
+
+        // 入力をチェック
+        answerEl.addEventListener('input', (e) => {
+            const inputText = e.target.value;
+            
+            if (inputText === currentWord) {
+                // 正解！
+                messageEl.textContent = 'OK!';
+                // 少し待ってから次の問題へ
+                setTimeout(setNextWord, 300); 
+            } else if (currentWord.startsWith(inputText)) {
+                // 入力途中
+                messageEl.textContent = '';
+            } else {
+                // タイプミス
+                messageEl.textContent = 'ミス！';
+            }
+        });
+
+        // ゲーム開始
+        loadWords();
+    </script>
+</body>
+</html>

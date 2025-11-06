@@ -82,15 +82,43 @@
             box-shadow: 0 2px 0 #ffc107;
         }
         /* --- キーボードのCSSここまで --- */
+
+		/* ▼▼▼ スタートボタンのスタイルを追加 ▼▼▼ */
+    #startButton {
+        font-size: 2em;
+        padding: 15px 30px;
+        cursor: pointer;
+        border-radius: 10px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        box-shadow: 0 4px #0056b3;
+        transition: all 0.1s;
+    }
+    #startButton:active {
+        transform: translateY(2px);
+        box-shadow: 0 2px #0056b3;
+    }
+
+    /* ▼▼▼ ゲームコンテナを最初は非表示にする ▼▼▼ */
+    #gameContainer {
+        display: none;
+    }
     </style>
 </head>
 <body>
 
     <h1>タイピングゲーム</h1>
-    <div id="question">読み込み中...</div>
-    <div id="romaji"></div> <input type="text" id="answer" autocomplete="off" autocorrect="off">
-    <div id="message"></div>
 
+    <button id="startButton">スタート</button>
+
+    <div id="gameContainer">
+        <div id="question">読み込み中...</div>
+        <div id="romaji"></div>
+        <input type="text" id="answer" autocomplete="off" autocorrect="off">
+        <div id="message"></div>
+
+    </div>
     <div id="keyboard">
         <div class="keyboard-row">
             <div class="key" data-char="~" data-key="`">`</div>
@@ -178,6 +206,9 @@
         // キーボード関連の要素
         const keyboardEl = document.getElementById("keyboard");
         const keyElements = keyboardEl.querySelectorAll('.key'); // 全てのキー要素
+
+		const startButton = document.getElementById("startButton");
+    	const gameContainer = document.getElementById("gameContainer");
 
         let typedRomaji = ''; // 現在入力中のローマ字
         let currentWordIndex = 0; // 現在のお題のローマ字の何文字目まで入力したか
@@ -359,10 +390,18 @@
         });
 
 	
-        // ゲーム開始
+       startButton.addEventListener('click', () => {
+        // 1. スタートボタンを非表示にする
+        startButton.style.display = 'none';
+        
+        // 2. ゲームコンテナを表示する
+        gameContainer.style.display = 'block';
+        
+        // 3. データを読み込んでゲームを開始する
         loadWords();
     </script>
 </body>
 
 </html>
+
 

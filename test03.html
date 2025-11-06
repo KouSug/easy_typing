@@ -116,6 +116,15 @@
     #gameContainer {
         display: none;
     }
+
+	#finalScore {
+        display: none; /* ★最初は非表示 */
+        font-size: 1.8em; /* 見やすいように大きめに */
+        font-weight: bold;
+        color: #333;
+        margin-top: 15px; /* ボタンとの間隔 */
+        margin-bottom: 20px;
+    }
 </style>
 </head>
 <body>
@@ -123,7 +132,7 @@
     <h1>タイピングゲーム</h1>
 
     <button id="startButton">スタート</button>
-	
+	<div id="finalScore"></div>
 	<div id="statsContainer">
         <div>スコア: <span id="score">0</span></div>
         <div>残り時間: <span id="timer">60</span> 秒</div>
@@ -231,6 +240,8 @@
     	const timerEl = document.getElementById("timer");
     	const statsContainer = document.getElementById("statsContainer");
 
+		const finalScoreEl = document.getElementById("finalScore");
+
     	let score = 0;
     	let timeLeft = 60; // 制限時間（秒）
     	let timerInterval = null; // タイマーのID
@@ -328,12 +339,12 @@
         timerInterval = null;
         
         answerEl.disabled = true; // 入力不可
-        questionEl.textContent = "タイムアップ！";
-        romajiEl.textContent = `あなたのスコアは ${score} 点です。`;
-        messageEl.textContent = "";
+        finalScoreEl.textContent = `タイムアップ！ スコアは ${score} 点です。`;
+        finalScoreEl.style.display = 'block'; // 表示する
+
         clearHighlight(); 
         
-        startButton.textContent = "もう一度プレイ"; // ボタンのテキスト変更
+        startButton.textContent = "もういちどプレイ"; // ボタンのテキスト変更
         startButton.style.display = 'block'; // スタートボタン再表示
         
         gameContainer.style.display = 'none'; // ゲーム画面非表示
@@ -413,7 +424,7 @@
                 // 正解！
                 
                 // ▼▼▼ スコア加算 (例: 1単語100点) ▼▼▼
-                score += 100; 
+                score += currentWord.r.length; 
                 scoreEl.textContent = score; // スコア表示を更新
                 
                 messageEl.textContent = 'OK!';
@@ -480,6 +491,7 @@
 </body>
 
 </html>
+
 
 
 

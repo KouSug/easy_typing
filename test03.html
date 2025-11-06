@@ -312,6 +312,8 @@
 
             // 押されたキーが期待する文字と一致するか
             if (pressedKey.toLowerCase() === expectedChar.toLowerCase()) {
+				e.preventDefault(); // ブラウザの標準入力をキャンセル
+				
                 typedRomaji += pressedKey.toLowerCase(); // 入力中の文字列に追加
                 currentWordIndex++; // 次の文字へ
 
@@ -359,4 +361,5 @@
         loadWords();
     </script>
 </body>
+
 </html>

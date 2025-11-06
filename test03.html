@@ -339,6 +339,8 @@
                 }
             } else if (pressedKey.length === 1 && /[a-z0-9\-\=\[\];',\.\\\/ ]/i.test(pressedKey)) {
                 // 期待しない文字が入力された場合 (アルファベット、数字、一部記号)
+				e.preventDefault(); // ブラウザの標準入力をキャンセル
+				
                 messageEl.textContent = 'ミス！';
                 // ハイライトは次の文字のまま
             }
@@ -363,3 +365,4 @@
 </body>
 
 </html>
+

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
+	<meta charset="UTF-8">
     <title>タイピングゲーム (ひらがな・ローマ字版)</title>
     <style>
         /* 既存のCSS */
@@ -94,24 +94,41 @@
         border: none;
         box-shadow: 0 4px #0056b3;
         transition: all 0.1s;
+		margin-bottom: 20px; /* スタートボタンの下に少し余白 */
     }
     #startButton:active {
         transform: translateY(2px);
         box-shadow: 0 2px #0056b3;
     }
 
+		/* ▼▼▼ スコア・タイマー用のスタイルを追加 ▼▼▼ */
+    #statsContainer {
+        display: none; /* ★最初は非表示 */
+        font-size: 1.5em;
+        font-weight: bold;
+        display: flex;
+        justify-content: space-around; /* スコアとタイマーを左右に配置 */
+        width: 350px; /* 幅を調整 */
+        margin: 0 auto 20px auto; /* 中央揃え */
+    }
+
     /* ▼▼▼ ゲームコンテナを最初は非表示にする ▼▼▼ */
     #gameContainer {
         display: none;
     }
-    </style>
+</style>
 </head>
 <body>
 
     <h1>タイピングゲーム</h1>
 
     <button id="startButton">スタート</button>
-
+	
+	<div id="statsContainer">
+        <div>スコア: <span id="score">0</span></div>
+        <div>残り時間: <span id="timer">60</span> 秒</div>
+    </div>
+	
     <div id="gameContainer">
         <div id="question">読み込み中...</div>
         <div id="romaji"></div>
@@ -210,6 +227,14 @@
 		const startButton = document.getElementById("startButton");
     	const gameContainer = document.getElementById("gameContainer");
 
+		const scoreEl = document.getElementById("score");
+    	const timerEl = document.getElementById("timer");
+    	const statsContainer = document.getElementById("statsContainer");
+
+    	let score = 0;
+    	let timeLeft = 60; // 制限時間（秒）
+    	let timerInterval = null; // タイマーのID
+
         let typedRomaji = ''; // 現在入力中のローマ字
         let currentWordIndex = 0; // 現在のお題のローマ字の何文字目まで入力したか
 
@@ -250,73 +275,110 @@
         // データを読み込む (変更なし)
         async function loadWords() { 
 	        try {
-                const response = await fetch(DATA_URL);
-                if (!response.ok) {
-                    throw new Error('データの取得に失敗しました。');
-                }
-                
-                const csvText = await response.text();
-                
-                // --- CSVをオブジェクト配列に変換 (修正箇所) ---
-                words = csvText.split(/\r?\n/) // 1. 行で区切る
-                             .filter(Boolean)      // 2. 空行を除去
-                             .map(row => {         // 3. 各行を処理
-                                const parts = row.split(','); // 4. カンマで区切る
-                                if (parts.length >= 2) {
-                                    return { 
-                                        q: parts[0].trim(), // A列 (ひらがな)
-                                        r: parts[1].trim()  // B列 (ローマ字)
-                                    };
-                                }
-                                return null; // データ不備の行はnull
-                             })
-                             .filter(Boolean); // nullになった行を除去
+            const response = await fetch(DATA_URL);
+            if (!response.ok) {
+                throw new Error('データの取得に失敗しました。');
+            }
+            
+            const csvText = await response.text();
+            
+            const loadedData = csvText.split(/\r?\n/)
+                                 .filter(Boolean)
+                                 .map(row => {
+                                    const parts = row.split(',');
+                                    if (parts.length >= 2) {
+                                        return { q: parts[0].trim(), r: parts[1].trim() };
+                                    }
+                                    return null;
+                                 })
+                                 .filter(Boolean);
 
-                if (words.length === 0) {
-                    throw new Error('単語リストが空か、形式が正しくありません。');
-                }
+            originalWords = [...loadedData]; // マスターリストを更新
 
-                console.log("読み込んだ単語オブジェクト:", words);
-                setNextWord();
-                
-            } catch (error) {
-                console.error("エラー:", error);
-                questionEl.textContent = error.message;
-            } 
+            if (originalWords.length === 0) {
+                throw new Error('単語リストが空か、形式が正しくありません。');
+            }
+        } catch (error) {
+            console.error("エラー:", error);
+            // スタートボタンの画面でエラーを表示
+            startButton.textContent = "エラー";
+            questionEl.textContent = error.message; // デバッグ用に表示
+            gameContainer.style.display = 'block'; // エラー表示のため表示
+        }
 	}
 
+		// ▼▼▼ タイマー関数を追加 ▼▼▼
+    function startTimer() {
+        // 既存のタイマーが残っていればクリア
+        if (timerInterval) clearInterval(timerInterval);
+
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            timerEl.textContent = timeLeft;
+
+            if (timeLeft <= 0) {
+                gameOver();
+            }
+        }, 1000); // 1秒ごと
+    }
+
+    // ▼▼▼ ゲームオーバー関数を追加 ▼▼▼
+    function gameOver() {
+        clearInterval(timerInterval); // タイマー停止
+        timerInterval = null;
+        
+        answerEl.disabled = true; // 入力不可
+        questionEl.textContent = "タイムアップ！";
+        romajiEl.textContent = `あなたのスコアは ${score} 点です。`;
+        messageEl.textContent = "";
+        clearHighlight(); 
+        
+        startButton.textContent = "もう一度プレイ"; // ボタンのテキスト変更
+        startButton.style.display = 'block'; // スタートボタン再表示
+        
+        gameContainer.style.display = 'none'; // ゲーム画面非表示
+        statsContainer.style.display = 'none'; // スコア・タイマー非表示
+    }
         // 次の問題をセット (修正)
         function setNextWord() {
-            clearHighlight(); // 前の問題のハイライトを消す
+        if (timeLeft <= 0) return; // タイムアップ時は何もしない
 
-            if (words.length === 0) {
-                questionEl.textContent = "ゲームクリア！";
-                romajiEl.textContent = "おめでとうございます！";
-                answerEl.disabled = true;
-                return;
-            }
-
-            // ここでランダムな単語を選び、words配列から削除するように変更
-            const index = Math.floor(Math.random() * words.length);
-            currentWord = words[index];
-            words.splice(index, 1); // 選択した単語を配列から削除 (重複しないように)
-
-            typedRomaji = ''; // 入力中のローマ字をリセット
-            currentWordIndex = 0; // 入力文字インデックスをリセット
-
-            questionEl.textContent = currentWord.q;
-            romajiEl.textContent = currentWord.r; // ローマ字ヒントは常に表示
-            answerEl.value = ''; // 入力欄をクリア
-            answerEl.focus(); 
-            messageEl.textContent = '';
-            
-            highlightNextKey(); // 次のキーをハイライト
+        clearHighlight();
+        
+        // ▼▼▼ 全問クリアの判定 ▼▼▼
+        if (words.length === 0) {
+            clearInterval(timerInterval); // タイマー停止
+            timerInterval = null;
+            questionEl.textContent = "全問クリア！ おめでとう！";
+            romajiEl.textContent = `あなたのスコアは ${score} 点です。`;
+            answerEl.disabled = true;
+            startButton.textContent = "もう一度プレイ";
+            startButton.style.display = 'block';
+            gameContainer.style.display = 'none';
+            statsContainer.style.display = 'none';
+            return;
         }
+
+        const index = Math.floor(Math.random() * words.length);
+        currentWord = words[index];
+        words.splice(index, 1); // 選択した単語を配列から削除
+
+        typedRomaji = ''; 
+        currentWordIndex = 0;
+
+        questionEl.textContent = currentWord.q;
+        romajiEl.textContent = currentWord.r;
+        answerEl.value = ''; 
+        answerEl.focus(); 
+        messageEl.textContent = '';
+        
+        highlightNextKey();
+    }
 
         // キー入力イベントを監視 (inputイベントから変更)
         document.addEventListener('keydown', (e) => {
-            if (!currentWord || answerEl.disabled) return; // お題がないか、ゲーム終了なら無視
-
+            if (!currentWord || answerEl.disabled || timeLeft <= 0) return;
+			
             const pressedKey = e.key; // 実際に押されたキーの文字
 
             // キーボードの視覚的フィードバック
@@ -341,41 +403,39 @@
             // 次に入力すべき文字
             const expectedChar = currentWord.r[currentWordIndex];
 
-            // 押されたキーが期待する文字と一致するか
-            if (pressedKey.toLowerCase() === expectedChar.toLowerCase()) {
-				e.preventDefault(); // ブラウザの標準入力をキャンセル
-				
-                typedRomaji += pressedKey.toLowerCase(); // 入力中の文字列に追加
-                currentWordIndex++; // 次の文字へ
+        if (pressedKey.toLowerCase() === expectedChar.toLowerCase()) {
+            e.preventDefault(); 
+            typedRomaji += pressedKey.toLowerCase();
+            currentWordIndex++;
+            answerEl.value = typedRomaji; 
 
-                answerEl.value = typedRomaji; // 入力欄にも反映 (IMEオフのため手動で)
-
-                if (typedRomaji === currentWord.r) {
-                    // 全文字正解！
-                    messageEl.textContent = 'OK!';
-                    setTimeout(setNextWord, 500); // 少し待って次の問題へ
-                } else {
-                    // 入力途中
-                    messageEl.textContent = '';
-                    highlightNextKey(); // 次のキーをハイライト
-                }
-            } else if (pressedKey === 'Backspace') {
-                e.preventDefault(); // ブラウザの戻るなどを防ぐ
-                if (typedRomaji.length > 0) {
-                    typedRomaji = typedRomaji.slice(0, -1); // 最後の文字を削除
-                    currentWordIndex--;
-                    answerEl.value = typedRomaji; // 入力欄にも反映
-                    messageEl.textContent = ''; // ミス表示をクリア
-                    highlightNextKey(); // 前のキーに戻ってハイライト
-                }
-            } else if (pressedKey.length === 1 && /[a-z0-9\-\=\[\];',\.\\\/ ]/i.test(pressedKey)) {
-                // 期待しない文字が入力された場合 (アルファベット、数字、一部記号)
-				e.preventDefault(); // ブラウザの標準入力をキャンセル
-				
-                messageEl.textContent = 'ミス！';
-                // ハイライトは次の文字のまま
+            if (typedRomaji === currentWord.r) {
+                // 正解！
+                
+                // ▼▼▼ スコア加算 (例: 1単語100点) ▼▼▼
+                score += 100; 
+                scoreEl.textContent = score; // スコア表示を更新
+                
+                messageEl.textContent = 'OK!';
+                setTimeout(setNextWord, 300); // 0.3秒後に次の問題へ
+            } else {
+                messageEl.textContent = '';
+                highlightNextKey(); 
             }
-        });
+        } else if (pressedKey === 'Backspace') {
+            e.preventDefault(); 
+            if (typedRomaji.length > 0) {
+                typedRomaji = typedRomaji.slice(0, -1);
+                currentWordIndex--;
+                answerEl.value = typedRomaji;
+                messageEl.textContent = ''; 
+                highlightNextKey(); 
+            }
+        } else if (pressedKey.length === 1 && /[a-z0-9\-\=\[\];',\.\\\/ ]/i.test(pressedKey)) {
+            e.preventDefault(); 
+            messageEl.textContent = 'ミス！';
+        }
+    });
 
         // キーが離されたときの処理 (視覚的フィードバック解除)
         document.addEventListener('keyup', (e) => {
@@ -390,20 +450,37 @@
         });
 
 	
-       startButton.addEventListener('click', () => {
-        // 1. スタートボタンを非表示にする
+       // ゲーム状態をリセットし、タイマーを開始する
+    startButton.addEventListener('click', () => {
+        // 1. 表示を切り替え
         startButton.style.display = 'none';
-        
-        // 2. ゲームコンテナを表示する
         gameContainer.style.display = 'block';
+        statsContainer.style.display = 'flex'; // ★スコア・タイマーを表示
         
-        // 3. データを読み込んでゲームを開始する
+        // 2. ゲーム状態をリセット
+        score = 0;
+        timeLeft = 60; // 制限時間をリセット
+        scoreEl.textContent = score;
+        timerEl.textContent = timeLeft;
+        answerEl.disabled = false; // 入力欄を有効化
+        messageEl.textContent = '';
+        currentWord = null; // 現在の単語をリセット
+        
+        // 3. 単語リストをマスターからコピーし直す
+        words = [...originalWords];
+        
+        // 4. 最初の単語をセット
+        setNextWord();
+        
+        // 5. タイマーを開始
+        startTimer();
+    });
         loadWords();
-	});
     </script>
 </body>
 
 </html>
+
 
 
 

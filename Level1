@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<meta charset="UTF-8">
+    <title>タイピングゲーム (ひらがな・ローマ字版)</title>
+    <style>
+        /* 既存のCSS */
+        body { font-family: sans-serif; text-align: center; margin: 20px; }
+        #question { font-size: 2em; font-weight: bold; margin: 10px; }
+        #romaji { font-size: 1.2em; color: #555; margin-bottom: 20px; }
+        #answer { 
+            font-size: 1.5em; 
+            padding: 10px; 
+            width: 300px; 
+            ime-mode: disabled; 
+            margin-bottom: 20px; /* キーボードとの間隔 */
+        }
+        #message { height: 1.5em; color: green; }
+
+        /* --- キーボードのCSSここから --- */
+        #keyboard {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 30px;
+            user-select: none; /* キーが選択されないように */
+        }
+
+        .keyboard-row {
+            display: flex;
+            margin-bottom: 5px; /* 行間のスペース */
+        }
+
+        .key {
+            width: 40px; /* 標準キーの幅 */
+            height: 40px; /* 標準キーの高さ */
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 2px; /* キー同士のスペース */
+            background-color: #f9f9f9;
+            box-shadow: 0 2px 0 #ddd;
+            font-size: 0.9em;
+            font-weight: bold;
+            text-transform: lowercase; /* 文字を小文字に */
+            position: relative;
+            transition: background-color 0.1s; /* ハイライトのアニメーション */
+        }
+
+        /* 特殊キーの幅 */
+        .key.tab, .key.caps, .key.shift, .key.enter, .key.backspace {
+            width: 60px; 
+        }
+        .key.ctrl, .key.alt, .key.cmd {
+             width: 50px;
+        }
+        .key.space {
+            width: 300px; /* スペースキー */
+        }
+        .key.backspace { background-color: #f0f0f0; }
+        .key.tab { background-color: #f0f0f0; }
+        .key.caps { background-color: #f0f0f0; }
+        .key.enter { background-color: #f0f0f0; }
+        .key.shift { background-color: #f0f0f0; }
+        .key.ctrl { background-color: #f0f0f0; }
+        .key.alt { background-color: #f0f0f0; }
+        .key.cmd { background-color: #f0f0f0; }
+
+        /* キーが押されたときの視覚的フィードバック */
+        .key.pressed {
+            background-color: #e0e0e0;
+            box-shadow: 0 1px 0 #bbb;
+            transform: translateY(1px);
+        }
+
+        /* ハイライトのスタイル */
+        .key.highlight {
+            background-color: #ffeb3b; /* 黄色 */
+            border-color: #ffc107;
+            box-shadow: 0 2px 0 #ffc107;
+        }
+        /* --- キーボードのCSSここまで --- */
+
+		/* ▼▼▼ スタートボタンのスタイルを追加 ▼▼▼ */
+    #startButton {
+        font-size: 2em;
+        padding: 15px 30px;
+        cursor: pointer;
+        border-radius: 10px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        box-shadow: 0 4px #0056b3;
+        transition: all 0.1s;
+		margin-bottom: 20px; /* スタートボタンの下に少し余白 */
+		display: block;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    #startButton:active {
+        transform: translateY(2px);
+        box-shadow: 0 2px #0056b3;
+    }
+
+		/* ▼▼▼ スコア・タイマー用のスタイルを追加 ▼▼▼ */
+    #statsContainer {
+        display: none; /* ★最初は非表示 */
+        font-size: 1.5em;
+        font-weight: bold;
+        text-align: center;
+        width: 420px; /* 幅を調整 */
+        margin: 0 auto 20px auto; /* 中央揃え */
+    }
+
+    /* ▼▼▼ ゲームコンテナを最初は非表示にする ▼▼▼ */
+    #gameContainer {
+        display: none;
+    }
+
+	#finalScore {
+        display: none; /* ★最初は非表示 */
+        font-size: 1.8em; /* 見やすいように大きめに */
+        font-weight: bold;
+        color: #333;
+        margin-top: 15px; /* ボタンとの間隔 */
+        margin-bottom: 20px;
+    }
+</style>
+</head>
+<body>
+
+    <h1>タイピングゲーム</h1>
+
+    <button id="startButton">スタート</button>
+	<div id="finalScore"></div>
+	<div id="statsContainer">
+        <div>スコア: <span id="score">0</span></div>
+        <div>のこり時間: <span id="timer">60</span> びょう</div>
+    </div>
+	
+    <div id="gameContainer">
+        <div id="question">よみこみ中...</div>
+        <div id="romaji"></div>
+        <input type="text" id="answer" autocomplete="off" autocorrect="off">
+        <div id="message"></div>
+
+    </div>
+    <div id="keyboard">
+        <div class="keyboard-row">
+            <div class="key" data-char="~" data-key="`">`</div>
+            <div class="key" data-char="1" data-key="1">1</div>
+            <div class="key" data-char="2" data-key="2">2</div>
+            <div class="key" data-char="3" data-key="3">3</div>
+            <div class="key" data-char="4" data-key="4">4</div>
+            <div class="key" data-char="5" data-key="5">5</div>
+            <div class="key" data-char="6" data-key="6">6</div>
+            <div class="key" data-char="7" data-key="7">7</div>
+            <div class="key" data-char="8" data-key="8">8</div>
+            <div class="key" data-char="9" data-key="9">9</div>
+            <div class="key" data-char="0" data-key="0">0</div>
+            <div class="key" data-char="-" data-key="-">-</div>
+            <div class="key" data-char="=" data-key="=">=</div>
+            <div class="key backspace" data-char="backspace" data-key="backspace">←</div>
+        </div>
+        <div class="keyboard-row">
+            <div class="key tab" data-char="tab" data-key="tab">Tab</div>
+            <div class="key" data-char="q" data-key="q">q</div>
+            <div class="key" data-char="w" data-key="w">w</div>
+            <div class="key" data-char="e" data-key="e">e</div>
+            <div class="key" data-char="r" data-key="r">r</div>
+            <div class="key" data-char="t" data-key="t">t</div>
+            <div class="key" data-char="y" data-key="y">y</div>
+            <div class="key" data-char="u" data-key="u">u</div>
+            <div class="key" data-char="i" data-key="i">i</div>
+            <div class="key" data-char="o" data-key="o">o</div>
+            <div class="key" data-char="p" data-key="p">p</div>
+            <div class="key" data-char="[" data-key="[">[</div>
+            <div class="key" data-char="]" data-key="]">]</div>
+            <div class="key" data-char="\" data-key="\">${'\\'}</div>
+        </div>
+        <div class="keyboard-row">
+            <div class="key caps" data-char="capslock" data-key="capslock">Caps Lock</div>
+            <div class="key" data-char="a" data-key="a">a</div>
+            <div class="key" data-char="s" data-key="s">s</div>
+            <div class="key" data-char="d" data-key="d">d</div>
+            <div class="key" data-char="f" data-key="f">f</div>
+            <div class="key" data-char="g" data-key="g">g</div>
+            <div class="key" data-char="h" data-key="h">h</div>
+            <div class="key" data-char="j" data-key="j">j</div>
+            <div class="key" data-char="k" data-key="k">k</div>
+            <div class="key" data-char="l" data-key="l">l</div>
+            <div class="key" data-char=";" data-key=";">;</div>
+            <div class="key" data-char="'" data-key="'">'</div>
+            <div class="key enter" data-char="enter" data-key="enter">Enter</div>
+        </div>
+        <div class="keyboard-row">
+            <div class="key shift" data-char="shift" data-key="shiftleft">Shift</div>
+            <div class="key" data-char="z" data-key="z">z</div>
+            <div class="key" data-char="x" data-key="x">x</div>
+            <div class="key" data-char="c" data-key="c">c</div>
+            <div class="key" data-char="v" data-key="v">v</div>
+            <div class="key" data-char="b" data-key="b">b</div>
+            <div class="key" data-char="n" data-key="n">n</div>
+            <div class="key" data-char="m" data-key="m">m</div>
+            <div class="key" data-char="," data-key=",">,</div>
+            <div class="key" data-char="." data-key=".">.</div>
+            <div class="key" data-char="/" data-key="/">/</div>
+            <div class="key shift" data-char="shift" data-key="shiftright">Shift</div>
+        </div>
+        <div class="keyboard-row">
+            <div class="key ctrl" data-char="ctrl" data-key="controlleft">Ctrl</div>
+            <div class="key alt" data-char="alt" data-key="altleft">Alt</div>
+            <div class="key space" data-char=" " data-key=" ">Space</div>
+            <div class="key alt" data-char="alt" data-key="altright">Alt</div>
+            <div class="key ctrl" data-char="ctrl" data-key="controlright">Ctrl</div>
+        </div>
+    </div>
+
+    <script>
+        // ▼▼▼ ステップ1で取得した「新しい」CSVの公開URLを貼り付け ▼▼▼
+        const DATA_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR-BFItFVtJWMXf0GdsdB3Ln7Hz5qvcjDVSyBU0T6MosUelNmO0_oVt9pWg9ekdyAtqaBDokkVWKolj/pub?gid=1545398596&single=true&output=csv';
+
+        // words配列。例: [{q: 'こんにちは', r: 'konnitiwa'}, {q: 'ありがとう', r: 'arigatou'}]
+        let words = [];
+        let currentWord = null; // 現在のお題オブジェクト
+
+        const questionEl = document.getElementById("question");
+        const romajiEl = document.getElementById("romaji"); // ローマ字表示用
+        const answerEl = document.getElementById("answer");
+        const messageEl = document.getElementById("message");
+
+        // キーボード関連の要素
+        const keyboardEl = document.getElementById("keyboard");
+        const keyElements = keyboardEl.querySelectorAll('.key'); // 全てのキー要素
+
+		const startButton = document.getElementById("startButton");
+    	const gameContainer = document.getElementById("gameContainer");
+
+		const scoreEl = document.getElementById("score");
+    	const timerEl = document.getElementById("timer");
+    	const statsContainer = document.getElementById("statsContainer");
+
+		const finalScoreEl = document.getElementById("finalScore");
+
+    	let score = 0;
+    	let timeLeft = 60; // 制限時間（秒）
+    	let timerInterval = null; // タイマーのID
+
+        let typedRomaji = ''; // 現在入力中のローマ字
+        let currentWordIndex = 0; // 現在のお題のローマ字の何文字目まで入力したか
+
+        // --- キーボードハイライト関連関数 ---
+        function clearHighlight() {
+            keyElements.forEach(key => key.classList.remove('highlight', 'pressed'));
+        }
+
+        function highlightNextKey() {
+            clearHighlight(); // 全てのハイライトを一度消す
+
+            if (!currentWord || currentWordIndex >= currentWord.r.length) {
+                // お題がないか、すべて入力済みならハイライトしない
+                return;
+            }
+
+            const nextChar = currentWord.r[currentWordIndex]; // 次に入力すべき文字
+
+            // その文字に対応するキー要素を探してハイライト
+            const targetKey = Array.from(keyElements).find(key => {
+                // data-key が現在の文字と一致するか、
+                // またはdata-char (表示文字) が現在の文字と一致するか
+                // Shiftが必要な記号 ('!', '@'など) に対応する場合、ここが複雑になりますが
+                // 今回は基本的な英数字のみを想定します
+                const keyChar = key.getAttribute('data-key') || key.getAttribute('data-char');
+                return keyChar && keyChar.toLowerCase() === nextChar.toLowerCase();
+            });
+
+            if (targetKey) {
+                targetKey.classList.add('highlight');
+            } else {
+                console.warn(`キーボード上で文字 '${nextChar}' に対応するキーが見つかりません。`);
+            }
+        }
+
+        // --- ゲームロジックの修正 ---
+
+        // データを読み込む (変更なし)
+        async function loadWords() { 
+	        try {
+            const response = await fetch(DATA_URL);
+            if (!response.ok) {
+                throw new Error('データの取得に失敗しました。');
+            }
+            
+            const csvText = await response.text();
+            
+            const loadedData = csvText.split(/\r?\n/)
+                                 .filter(Boolean)
+                                 .map(row => {
+                                    const parts = row.split(',');
+                                    if (parts.length >= 2) {
+                                        return { q: parts[0].trim(), r: parts[1].trim() };
+                                    }
+                                    return null;
+                                 })
+                                 .filter(Boolean);
+
+            originalWords = [...loadedData]; // マスターリストを更新
+
+            if (originalWords.length === 0) {
+                throw new Error('単語リストが空か、形式が正しくありません。');
+            }
+        } catch (error) {
+            console.error("エラー:", error);
+            // スタートボタンの画面でエラーを表示
+            startButton.textContent = "エラー";
+            questionEl.textContent = error.message; // デバッグ用に表示
+            gameContainer.style.display = 'block'; // エラー表示のため表示
+        }
+	}
+
+		// ▼▼▼ タイマー関数を追加 ▼▼▼
+    function startTimer() {
+        // 既存のタイマーが残っていればクリア
+        if (timerInterval) clearInterval(timerInterval);
+
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            timerEl.textContent = timeLeft;
+
+            if (timeLeft <= 0) {
+                gameOver();
+            }
+        }, 1000); // 1秒ごと
+    }
+
+    // ▼▼▼ ゲームオーバー関数を追加 ▼▼▼
+    function gameOver() {
+        clearInterval(timerInterval); // タイマー停止
+        timerInterval = null;
+        
+        answerEl.disabled = true; // 入力不可
+        finalScoreEl.textContent = `タイムアップ！ スコアは ${score} 点です。`;
+        finalScoreEl.style.display = 'block'; // 表示する
+
+        clearHighlight(); 
+        
+        startButton.textContent = "もういちどプレイ"; // ボタンのテキスト変更
+        startButton.style.display = 'block'; // スタートボタン再表示
+        
+        gameContainer.style.display = 'none'; // ゲーム画面非表示
+        statsContainer.style.display = 'none'; // スコア・タイマー非表示
+    }
+        // 次の問題をセット (修正)
+        function setNextWord() {
+        if (timeLeft <= 0) return; // タイムアップ時は何もしない
+
+        clearHighlight();
+        
+        // ▼▼▼ 全問クリアの判定 ▼▼▼
+        if (words.length === 0) {
+            clearInterval(timerInterval); // タイマー停止
+            timerInterval = null;
+            questionEl.textContent = "全問クリア！ おめでとう！";
+            romajiEl.textContent = `あなたのスコアは ${score} 点です。`;
+            answerEl.disabled = true;
+            startButton.textContent = "もう一度プレイ";
+            startButton.style.display = 'block';
+            gameContainer.style.display = 'none';
+            statsContainer.style.display = 'none';
+            return;
+        }
+
+        const index = Math.floor(Math.random() * words.length);
+        currentWord = words[index];
+        words.splice(index, 1); // 選択した単語を配列から削除
+
+        typedRomaji = ''; 
+        currentWordIndex = 0;
+
+        questionEl.textContent = currentWord.q;
+        romajiEl.textContent = currentWord.r;
+        answerEl.value = ''; 
+        answerEl.focus(); 
+        messageEl.textContent = '';
+        
+        highlightNextKey();
+    }
+
+        // キー入力イベントを監視 (inputイベントから変更)
+        document.addEventListener('keydown', (e) => {
+            if (!currentWord || answerEl.disabled || timeLeft <= 0) return;
+			
+            const pressedKey = e.key; // 実際に押されたキーの文字
+
+            // キーボードの視覚的フィードバック
+            const pressedKeyEl = Array.from(keyElements).find(key => 
+                key.getAttribute('data-key') === pressedKey.toLowerCase() ||
+                (key.getAttribute('data-char') === pressedKey.toLowerCase() && !key.getAttribute('data-key')) // data-keyがない場合のフォールバック
+            );
+            if (pressedKeyEl) {
+                pressedKeyEl.classList.add('pressed');
+            }
+
+            // スペースキーが押された時に画面がスクロールするのを防ぐ
+            if (pressedKey === ' ' || pressedKey === 'Spacebar') {
+                e.preventDefault(); 
+            }
+
+            // 入力欄にフォーカスが当たっているか確認 (必要なら)
+            // if (document.activeElement !== answerEl) {
+            //     answerEl.focus();
+            // }
+
+            // 次に入力すべき文字
+            const expectedChar = currentWord.r[currentWordIndex];
+
+        if (pressedKey.toLowerCase() === expectedChar.toLowerCase()) {
+            e.preventDefault(); 
+            typedRomaji += pressedKey.toLowerCase();
+            currentWordIndex++;
+            answerEl.value = typedRomaji; 
+
+            if (typedRomaji === currentWord.r) {
+                // 正解！
+                
+                // ▼▼▼ スコア加算 (例: 1単語100点) ▼▼▼
+                score += currentWord.r.length; 
+                scoreEl.textContent = score; // スコア表示を更新
+                
+                messageEl.textContent = 'OK!';
+                setTimeout(setNextWord, 300); // 0.3秒後に次の問題へ
+            } else {
+                messageEl.textContent = '';
+                highlightNextKey(); 
+            }
+        } else if (pressedKey === 'Backspace') {
+            e.preventDefault(); 
+            if (typedRomaji.length > 0) {
+                typedRomaji = typedRomaji.slice(0, -1);
+                currentWordIndex--;
+                answerEl.value = typedRomaji;
+                messageEl.textContent = ''; 
+                highlightNextKey(); 
+            }
+        } else if (pressedKey.length === 1 && /[a-z0-9\-\=\[\];',\.\\\/ ]/i.test(pressedKey)) {
+            e.preventDefault(); 
+            messageEl.textContent = 'ミス！';
+        }
+    });
+
+        // キーが離されたときの処理 (視覚的フィードバック解除)
+        document.addEventListener('keyup', (e) => {
+            const releasedKey = e.key;
+            const releasedKeyEl = Array.from(keyElements).find(key => 
+                key.getAttribute('data-key') === releasedKey.toLowerCase() ||
+                (key.getAttribute('data-char') === releasedKey.toLowerCase() && !key.getAttribute('data-key'))
+            );
+            if (releasedKeyEl) {
+                releasedKeyEl.classList.remove('pressed');
+            }
+        });
+
+	
+       // ゲーム状態をリセットし、タイマーを開始する
+    startButton.addEventListener('click', () => {
+        // 1. 表示を切り替え
+        startButton.style.display = 'none';
+        gameContainer.style.display = 'block';
+        statsContainer.style.display = 'flex'; // ★スコア・タイマーを表示
+        
+        // 2. ゲーム状態をリセット
+        score = 0;
+        timeLeft = 60; // 制限時間をリセット
+        scoreEl.textContent = score;
+        timerEl.textContent = timeLeft;
+        answerEl.disabled = false; // 入力欄を有効化
+        messageEl.textContent = '';
+        currentWord = null; // 現在の単語をリセット
+        
+        // 3. 単語リストをマスターからコピーし直す
+        words = [...originalWords];
+        
+        // 4. 最初の単語をセット
+        setNextWord();
+        
+        // 5. タイマーを開始
+        startTimer();
+    });
+        loadWords();
+    </script>
+</body>
+
+</html>

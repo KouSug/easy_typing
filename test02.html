@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>タイピングゲーム (ひらがな・ローマ字版)</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; }
+        /* ひらがなのお題 */
+        #question { font-size: 2em; font-weight: bold; margin: 10px; }
+        /* ローマ字のヒント (少し小さく) */
+        #romaji { font-size: 1.2em; color: #555; margin-bottom: 20px; }
+        #answer { 
+            font-size: 1.5em; 
+            padding: 10px; 
+            width: 300px; 
+            ime-mode: disabled; /* IMEを強制的にオフ (英数入力) */
+        }
+        #message { height: 1.5em; color: green; }
+    </style>
+</head>
+<body>
+
+    <h1>タイピングゲーム</h1>
+    <div id="question">読み込み中...</div>
+    <div id="romaji"></div> <input type="text" id="answer" autocomplete="off" autocorrect="off">
+    <div id="message"></div>
+
+    <script>
+        // ▼▼▼ ステップ1で取得した「新しい」CSVの公開URLを貼り付け ▼▼▼
+        const DATA_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR-BFItFVtJWMXf0GdsdB3Ln7Hz5qvcjDVSyBU0T6MosUelNmO0_oVt9pWg9ekdyAtqaBDokkVWKolj/pub?gid=543569375&single=true&output=csv';
+
+        // words配列。例: [{q: 'こんにちは', r: 'konnitiwa'}, {q: 'ありがとう', r: 'arigatou'}]
+        let words = [];
+        let currentWord = null; // 現在のお題オブジェクト
+
+        const questionEl = document.getElementById("question");
+        const romajiEl = document.getElementById("romaji"); // ローマ字表示用
+        const answerEl = document.getElementById("answer");
+        const messageEl = document.getElementById("message");
+
+        // データを読み込む
+        async function loadWords() {
+            try {
+                const response = await fetch(DATA_URL);
+                if (!response.ok) {
+                    throw new Error('データの取得に失敗しました。');
+                }
+                
+                const csvText = await response.text();
+                
+                // --- CSVをオブジェクト配列に変換 (修正箇所) ---
+                words = csvText.split(/\r?\n/) // 1. 行で区切る
+                             .filter(Boolean)      // 2. 空行を除去
+                             .map(row => {         // 3. 各行を処理
+                                const parts = row.split(','); // 4. カンマで区切る
+                                if (parts.length >= 2) {
+                                    return { 
+                                        q: parts[0].trim(), // A列 (ひらがな)
+                                        r: parts[1].trim()  // B列 (ローマ字)
+                                    };
+                                }
+                                return null; // データ不備の行はnull
+                             })
+                             .filter(Boolean); // nullになった行を除去
+
+                if (words.length === 0) {
+                    throw new Error('単語リストが空か、形式が正しくありません。');
+                }
+
+                console.log("読み込んだ単語オブジェクト:", words);
+                setNextWord();
+                
+            } catch (error) {
+                console.error("エラー:", error);
+                questionEl.textContent = error.message;
+            }
+        }
+
+        // 次の問題をセット
+        function setNextWord() {
+            if (words.length === 0) {
+                questionEl.textContent = "ゲームクリア！";
+                romajiEl.textContent = "おめでとうございます！";
+                answerEl.disabled = true; // 入力不可にする
+                return;
+            }
+
+            const index = Math.floor(Math.random() * words.length);
+            currentWord = words[index]; // 例: {q: 'こんにちは', r: 'konnitiwa'}
+
+            // 画面にセット (修正箇所)
+            questionEl.textContent = currentWord.q; // お題(ひらがな)
+            romajiEl.textContent = currentWord.r;   // ローマ字 (ヒントとして表示)
+            
+            answerEl.value = ''; // 入力欄をクリア
+            answerEl.focus(); 
+            messageEl.textContent = '';
+        }
+
+        // 入力をチェック
+        answerEl.addEventListener('input', (e) => {
+            if (!currentWord) return; // お題がセットされる前は無視
+
+            const inputText = e.target.value;
+            
+            // 正解判定 (修正箇所)
+            if (inputText === currentWord.r) {
+                // 正解！
+                messageEl.textContent = 'OK!';
+                setTimeout(setNextWord, 300); 
+            
+            // 入力途中かどうかの判定 (修正箇所)
+            } else if (currentWord.r.startsWith(inputText)) {
+                // 入力途中
+                messageEl.textContent = '';
+            } else {
+                // タイプミス
+                messageEl.textContent = 'ミス！';
+            }
+        });
+
+        // ゲーム開始
+        loadWords();
+    </script>
+</body>
+</html>

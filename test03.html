@@ -222,7 +222,7 @@
 
         // データを読み込む (変更なし)
         async function loadWords() { 
-			try {
+	        try {
                 const response = await fetch(DATA_URL);
                 if (!response.ok) {
                     throw new Error('データの取得に失敗しました。');
@@ -255,8 +255,8 @@
             } catch (error) {
                 console.error("エラー:", error);
                 questionEl.textContent = error.message;
-            }
-		}
+            } 
+	}
 
         // 次の問題をセット (修正)
         function setNextWord() {
@@ -363,5 +363,4 @@
         loadWords();
     </script>
 </body>
-
 </html>

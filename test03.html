@@ -221,7 +221,42 @@
         // --- ゲームロジックの修正 ---
 
         // データを読み込む (変更なし)
-        async function loadWords() { /* ... 変更なし ... */ }
+        async function loadWords() { 
+			try {
+                const response = await fetch(DATA_URL);
+                if (!response.ok) {
+                    throw new Error('データの取得に失敗しました。');
+                }
+                
+                const csvText = await response.text();
+                
+                // --- CSVをオブジェクト配列に変換 (修正箇所) ---
+                words = csvText.split(/\r?\n/) // 1. 行で区切る
+                             .filter(Boolean)      // 2. 空行を除去
+                             .map(row => {         // 3. 各行を処理
+                                const parts = row.split(','); // 4. カンマで区切る
+                                if (parts.length >= 2) {
+                                    return { 
+                                        q: parts[0].trim(), // A列 (ひらがな)
+                                        r: parts[1].trim()  // B列 (ローマ字)
+                                    };
+                                }
+                                return null; // データ不備の行はnull
+                             })
+                             .filter(Boolean); // nullになった行を除去
+
+                if (words.length === 0) {
+                    throw new Error('単語リストが空か、形式が正しくありません。');
+                }
+
+                console.log("読み込んだ単語オブジェクト:", words);
+                setNextWord();
+                
+            } catch (error) {
+                console.error("エラー:", error);
+                questionEl.textContent = error.message;
+            }
+		}
 
         // 次の問題をセット (修正)
         function setNextWord() {
@@ -328,4 +363,5 @@
         loadWords();
     </script>
 </body>
+
 </html>

@@ -175,84 +175,151 @@
         const answerEl = document.getElementById("answer");
         const messageEl = document.getElementById("message");
 
-        // データを読み込む
-        async function loadWords() {
-            try {
-                const response = await fetch(DATA_URL);
-                if (!response.ok) {
-                    throw new Error('データの取得に失敗しました。');
-                }
-                
-                const csvText = await response.text();
-                
-                // --- CSVをオブジェクト配列に変換 (修正箇所) ---
-                words = csvText.split(/\r?\n/) // 1. 行で区切る
-                             .filter(Boolean)      // 2. 空行を除去
-                             .map(row => {         // 3. 各行を処理
-                                const parts = row.split(','); // 4. カンマで区切る
-                                if (parts.length >= 2) {
-                                    return { 
-                                        q: parts[0].trim(), // A列 (ひらがな)
-                                        r: parts[1].trim()  // B列 (ローマ字)
-                                    };
-                                }
-                                return null; // データ不備の行はnull
-                             })
-                             .filter(Boolean); // nullになった行を除去
+        const romajiEl = document.getElementById("romaji");
+        const answerEl = document.getElementById("answer");
+        const messageEl = document.getElementById("message");
 
-                if (words.length === 0) {
-                    throw new Error('単語リストが空か、形式が正しくありません。');
-                }
+        // キーボード関連の要素
+        const keyboardEl = document.getElementById("keyboard");
+        const keyElements = keyboardEl.querySelectorAll('.key'); // 全てのキー要素
 
-                console.log("読み込んだ単語オブジェクト:", words);
-                setNextWord();
-                
-            } catch (error) {
-                console.error("エラー:", error);
-                questionEl.textContent = error.message;
-            }
+        let typedRomaji = ''; // 現在入力中のローマ字
+        let currentWordIndex = 0; // 現在のお題のローマ字の何文字目まで入力したか
+
+        // --- キーボードハイライト関連関数 ---
+        function clearHighlight() {
+            keyElements.forEach(key => key.classList.remove('highlight', 'pressed'));
         }
 
-        // 次の問題をセット
-        function setNextWord() {
-            if (words.length === 0) {
-                questionEl.textContent = "ゲームクリア！";
-                romajiEl.textContent = "おめでとうございます！";
-                answerEl.disabled = true; // 入力不可にする
+        function highlightNextKey() {
+            clearHighlight(); // 全てのハイライトを一度消す
+
+            if (!currentWord || currentWordIndex >= currentWord.r.length) {
+                // お題がないか、すべて入力済みならハイライトしない
                 return;
             }
 
-            const index = Math.floor(Math.random() * words.length);
-            currentWord = words[index]; // 例: {q: 'こんにちは', r: 'konnitiwa'}
+            const nextChar = currentWord.r[currentWordIndex]; // 次に入力すべき文字
 
-            // 画面にセット (修正箇所)
-            questionEl.textContent = currentWord.q; // お題(ひらがな)
-            romajiEl.textContent = currentWord.r;   // ローマ字 (ヒントとして表示)
-            
+            // その文字に対応するキー要素を探してハイライト
+            const targetKey = Array.from(keyElements).find(key => {
+                // data-key が現在の文字と一致するか、
+                // またはdata-char (表示文字) が現在の文字と一致するか
+                // Shiftが必要な記号 ('!', '@'など) に対応する場合、ここが複雑になりますが
+                // 今回は基本的な英数字のみを想定します
+                const keyChar = key.getAttribute('data-key') || key.getAttribute('data-char');
+                return keyChar && keyChar.toLowerCase() === nextChar.toLowerCase();
+            });
+
+            if (targetKey) {
+                targetKey.classList.add('highlight');
+            } else {
+                console.warn(`キーボード上で文字 '${nextChar}' に対応するキーが見つかりません。`);
+            }
+        }
+
+        // --- ゲームロジックの修正 ---
+
+        // データを読み込む (変更なし)
+        async function loadWords() { /* ... 変更なし ... */ }
+
+        // 次の問題をセット (修正)
+        function setNextWord() {
+            clearHighlight(); // 前の問題のハイライトを消す
+
+            if (words.length === 0) {
+                questionEl.textContent = "ゲームクリア！";
+                romajiEl.textContent = "おめでとうございます！";
+                answerEl.disabled = true;
+                return;
+            }
+
+            // ここでランダムな単語を選び、words配列から削除するように変更
+            const index = Math.floor(Math.random() * words.length);
+            currentWord = words[index];
+            words.splice(index, 1); // 選択した単語を配列から削除 (重複しないように)
+
+            typedRomaji = ''; // 入力中のローマ字をリセット
+            currentWordIndex = 0; // 入力文字インデックスをリセット
+
+            questionEl.textContent = currentWord.q;
+            romajiEl.textContent = currentWord.r; // ローマ字ヒントは常に表示
             answerEl.value = ''; // 入力欄をクリア
             answerEl.focus(); 
             messageEl.textContent = '';
+            
+            highlightNextKey(); // 次のキーをハイライト
         }
 
-        // 入力をチェック
-        answerEl.addEventListener('input', (e) => {
-            if (!currentWord) return; // お題がセットされる前は無視
+        // キー入力イベントを監視 (inputイベントから変更)
+        document.addEventListener('keydown', (e) => {
+            if (!currentWord || answerEl.disabled) return; // お題がないか、ゲーム終了なら無視
 
-            const inputText = e.target.value;
-            
-            // 正解判定 (修正箇所)
-            if (inputText === currentWord.r) {
-                // 正解！
-                messageEl.textContent = 'OK!';
-                setTimeout(setNextWord, 300); 
-            
-            // 入力途中かどうかの判定 (修正箇所)
-            } else if (currentWord.r.startsWith(inputText)) {
-                // 入力途中
-                messageEl.textContent = '';
-            } else {
-                // タイプミス
+            const pressedKey = e.key; // 実際に押されたキーの文字
+
+            // キーボードの視覚的フィードバック
+            const pressedKeyEl = Array.from(keyElements).find(key => 
+                key.getAttribute('data-key') === pressedKey.toLowerCase() ||
+                (key.getAttribute('data-char') === pressedKey.toLowerCase() && !key.getAttribute('data-key')) // data-keyがない場合のフォールバック
+            );
+            if (pressedKeyEl) {
+                pressedKeyEl.classList.add('pressed');
+            }
+
+            // スペースキーが押された時に画面がスクロールするのを防ぐ
+            if (pressedKey === ' ' || pressedKey === 'Spacebar') {
+                e.preventDefault(); 
+            }
+
+            // 入力欄にフォーカスが当たっているか確認 (必要なら)
+            // if (document.activeElement !== answerEl) {
+            //     answerEl.focus();
+            // }
+
+            // 次に入力すべき文字
+            const expectedChar = currentWord.r[currentWordIndex];
+
+            // 押されたキーが期待する文字と一致するか
+            if (pressedKey.toLowerCase() === expectedChar.toLowerCase()) {
+                typedRomaji += pressedKey.toLowerCase(); // 入力中の文字列に追加
+                currentWordIndex++; // 次の文字へ
+
+                answerEl.value = typedRomaji; // 入力欄にも反映 (IMEオフのため手動で)
+
+                if (typedRomaji === currentWord.r) {
+                    // 全文字正解！
+                    messageEl.textContent = 'OK!';
+                    setTimeout(setNextWord, 500); // 少し待って次の問題へ
+                } else {
+                    // 入力途中
+                    messageEl.textContent = '';
+                    highlightNextKey(); // 次のキーをハイライト
+                }
+            } else if (pressedKey === 'Backspace') {
+                e.preventDefault(); // ブラウザの戻るなどを防ぐ
+                if (typedRomaji.length > 0) {
+                    typedRomaji = typedRomaji.slice(0, -1); // 最後の文字を削除
+                    currentWordIndex--;
+                    answerEl.value = typedRomaji; // 入力欄にも反映
+                    messageEl.textContent = ''; // ミス表示をクリア
+                    highlightNextKey(); // 前のキーに戻ってハイライト
+                }
+            } else if (pressedKey.length === 1 && /[a-z0-9\-\=\[\];',\.\\\/ ]/i.test(pressedKey)) {
+                // 期待しない文字が入力された場合 (アルファベット、数字、一部記号)
                 messageEl.textContent = 'ミス！';
+                // ハイライトは次の文字のまま
+            }
+        });
+
+        // キーが離されたときの処理 (視覚的フィードバック解除)
+        document.addEventListener('keyup', (e) => {
+            const releasedKey = e.key;
+            const releasedKeyEl = Array.from(keyElements).find(key => 
+                key.getAttribute('data-key') === releasedKey.toLowerCase() ||
+                (key.getAttribute('data-char') === releasedKey.toLowerCase() && !key.getAttribute('data-key'))
+            );
+            if (releasedKeyEl) {
+                releasedKeyEl.classList.remove('pressed');
             }
         });
 
@@ -260,4 +327,5 @@
         loadWords();
     </script>
 </body>
+
 </html>
